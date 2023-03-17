@@ -1,12 +1,6 @@
-// const admin = require('firebase-admin');
-
-// const serviceAccount = require('./serviceAccountKey.json');
-
-// admin.initializeApp({
-//   credential: admin.credential.cert(serviceAccount)
-// });
 
 var admin = require("firebase-admin");
+const cors = require('cors');
 
 var serviceAccount = require("./serviceAccountKey.json");
 
@@ -18,9 +12,11 @@ admin.initializeApp({
 const db = admin.firestore();
 
 const express = require('express');
+
 const bodyParser = require('body-parser');
 
 const app = express();
+app.use(cors()); 
 app.use(bodyParser.json());
 
 app.post('/users', (req, res) => {
@@ -61,6 +57,7 @@ app.post('/users', (req, res) => {
   //    res.status(500).send('Server error');
   //    }
   //   });
+  
   //Completed Vaccine
    app.get('/CompletedVaccine', async (req, res) => 
   { // Get collection data with where clause 
@@ -74,21 +71,6 @@ app.post('/users', (req, res) => {
      res.json(result); });
 
 
-  //Due Vaccine
-  app.get('/DueVaccine', async (req, res) => 
-  { // Get collection data with where clause 
-    const collection = admin.firestore().collection('VaccineDetails'); 
-    const currentDate = new Date();
-    const query = collection.where('ScheduledOn', '<=', new Date( '2023-03-17' ) ).where('Date', '=', null); 
-    const result = await query.get().then(snapshot => { 
-      return snapshot.docs.map(doc => doc.data());
-     }); 
-
-     
-
-
-
-     res.json(result); });
 
      //Vaccine Taken
      app.get('/VaccineTaken', async (req, res) => {
@@ -125,6 +107,109 @@ app.post('/users', (req, res) => {
           res.status(500).send('Server error');
       }
   });
+
+
+   //upcoming Vaccine
+   app.get('/UpcomingVaccine', async (req, res) => {
+    try {
+        const collection1Ref = db.collection('VaccineDetails');
+        const collection2Ref = db.collection('Childs');
+        
+        const snapshot1 = await collection1Ref.get();
+        const currentDate = new Date(); 
+        const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+         const formattedDate = currentDate.toLocaleDateString('en-US', options);
+         
+        const result = [];
+        for (const doc1 of snapshot1.docs) {
+            const data1 = doc1.data();
+            if (data1.ScheduledOn) 
+            {
+            const ScheduleOn = new Date(data1.ScheduledOn);
+          
+            const Scheduledate = { year: 'numeric', month: '2-digit', day: '2-digit' };
+            const formatedSchDate = ScheduleOn.toLocaleDateString('en-US', Scheduledate);
+            console.log(formatedSchDate)
+            
+       
+         
+            if (formatedSchDate  >= formattedDate ) 
+            {
+               if(!data1.Date)
+              {
+            const snapshot2 = await collection2Ref.where('ChildId', '==', data1.patientID).get();
+
+            for (const doc2 of snapshot2.docs) {
+                const data2 = doc2.data();
+
+                const combinedData = {
+                    ...data1,
+                    ...data2
+                };
+                result.push(combinedData);
+            }
+          }
+          }
+        }
+        }
+        res.status(200).json(result);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Server error');
+    }
+});
+
+
+
+ //Due Vaccine
+ app.get('/DueVaccine', async (req, res) => {
+  try {
+      const collection1Ref = db.collection('VaccineDetails');
+      const collection2Ref = db.collection('Childs');
+      
+      const snapshot1 = await collection1Ref.get();
+      const currentDate = new Date(); 
+      const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+       const formattedDate = currentDate.toLocaleDateString('en-US', options);
+       
+      const result = [];
+      for (const doc1 of snapshot1.docs) {
+          const data1 = doc1.data();
+          if (data1.ScheduledOn) 
+          {
+          const ScheduleOn = new Date(data1.ScheduledOn);
+        
+          const Scheduledate = { year: 'numeric', month: '2-digit', day: '2-digit' };
+          const formatedSchDate = ScheduleOn.toLocaleDateString('en-US', Scheduledate);
+          console.log(formatedSchDate)
+          
+     
+       
+          if (formatedSchDate  < formattedDate ) 
+          {
+             if(!data1.Date)
+            {
+          const snapshot2 = await collection2Ref.where('ChildId', '==', data1.patientID).get();
+
+          for (const doc2 of snapshot2.docs) {
+              const data2 = doc2.data();
+
+              const combinedData = {
+                  ...data1,
+                  ...data2
+              };
+              result.push(combinedData);
+          }
+        }
+        }
+      }
+      }
+      res.status(200).json(result);
+  } catch (error) {
+      console.error(error);
+      res.status(500).send('Server error');
+  }
+});
 
 
 app.listen(3000, () => {
